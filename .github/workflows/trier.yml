@@ -4,6 +4,12 @@ on:
   push:
     paths:
       - 'inbox/**'
+      - '*.jpg'
+      - '*.jpeg'
+      - '*.png'
+      - '*.JPG'
+      - '*.JPEG'
+      - '*.PNG'
   workflow_dispatch:
 
 permissions:
@@ -25,8 +31,9 @@ jobs:
 
       - name: Ranger les stills par épisode
         run: |
-          shopt -s nullglob
-          for f in inbox/*; do
+          shopt -s nullglob nocaseglob
+          for f in inbox/* *.jpg *.jpeg *.png *.webp *.tif *.tiff; do
+            [ -f "$f" ] || continue
             name=$(basename "$f")
             if [[ "$name" =~ ^[Ee][Pp]_([0-9]+)_ ]]; then
               ep="EP_${BASH_REMATCH[1]}"
