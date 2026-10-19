@@ -38,7 +38,7 @@ jobs:
             if [[ "$name" =~ ^[Ee][Pp]_([0-9]+)_ ]]; then
               ep="EP_${BASH_REMATCH[1]}"
               mkdir -p "episodes/$ep"
-              git mv "$f" "episodes/$ep/$name"
+              git mv -f "$f" "episodes/$ep/$name"
             fi
           done
 
