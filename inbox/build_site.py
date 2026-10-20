@@ -1,37 +1,50 @@
 import os, re, shutil, html
+from urllib.parse import quote
 
 serie = html.escape(os.environ.get("SERIE", "Stills"))
 exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
+prefix = re.compile(r"^ep_([0-9]+(?:\s*-\s*[0-9]+)*)_", re.I)
 
 def natural(s):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
 
+def episodes_of(name):
+    m = prefix.match(name)
+    if not m:
+        return []
+    return sorted(set(int(n) for n in re.findall(r"\d+", m.group(1))))
+
 shutil.rmtree("_site", ignore_errors=True)
 os.makedirs("_site")
+
+by_ep = {}
 if os.path.isdir("episodes"):
     shutil.copytree("episodes", "_site/episodes")
+    for folder in os.listdir("episodes"):
+        d = os.path.join("episodes", folder)
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
+            if f.lower().endswith(exts):
+                for ep in episodes_of(f):
+                    by_ep.setdefault(ep, []).append((f, f"episodes/{folder}/{f}"))
 
 sections = ""
-if os.path.isdir("episodes"):
-    for ep in sorted(os.listdir("episodes"), key=natural):
-        files = sorted(
-            [f for f in os.listdir(f"episodes/{ep}") if f.lower().endswith(exts)],
-            key=natural,
-        )
-        if not files:
-            continue
-        cards = "".join(
-            f'<a href="episodes/{ep}/{f}" target="_blank">'
-            f'<img loading="lazy" src="episodes/{ep}/{f}"><span>{html.escape(f)}</span></a>'
-            for f in files
-        )
-        sections += (
-            f'<h2 id="{ep}">{ep.replace("_", " ")} '
-            f'<small>({len(files)} stills)</small></h2><div class="grid">{cards}</div>'
-        )
+for ep in sorted(by_ep):
+    items = sorted(by_ep[ep], key=lambda x: natural(x[0]))
+    cards = "".join(
+        f'<a href="{quote(p)}" target="_blank">'
+        f'<img loading="lazy" src="{quote(p)}"><span>{html.escape(f)}</span></a>'
+        for f, p in items
+    )
+    sections += (
+        f'<h2 id="EP_{ep}">EP {ep} '
+        f'<small>({len(items)} stills)</small></h2><div class="grid">{cards}</div>'
+    )
 
 page = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title>{serie} – Stills</title>
 <style>
 body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:24px}}
