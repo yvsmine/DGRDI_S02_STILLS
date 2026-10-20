@@ -1,4 +1,5 @@
 import os, re, shutil, html
+from urllib.parse import quote
 
 serie = html.escape(os.environ.get("SERIE", "Stills"))
 exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
@@ -14,15 +15,19 @@ if os.path.isdir("episodes"):
 sections = ""
 if os.path.isdir("episodes"):
     for ep in sorted(os.listdir("episodes"), key=natural):
+        d = os.path.join("episodes", ep)
+        if not os.path.isdir(d):
+            continue
         files = sorted(
-            [f for f in os.listdir(f"episodes/{ep}") if f.lower().endswith(exts)],
+            [f for f in os.listdir(d) if f.lower().endswith(exts)],
             key=natural,
         )
         if not files:
             continue
         cards = "".join(
-            f'<a href="episodes/{ep}/{f}" target="_blank">'
-            f'<img loading="lazy" src="episodes/{ep}/{f}"><span>{html.escape(f)}</span></a>'
+            f'<a href="{quote("episodes/" + ep + "/" + f)}" target="_blank">'
+            f'<img loading="lazy" src="{quote("episodes/" + ep + "/" + f)}">'
+            f'<span>{html.escape(f)}</span></a>'
             for f in files
         )
         sections += (
@@ -32,6 +37,7 @@ if os.path.isdir("episodes"):
 
 page = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title>{serie} – Stills</title>
 <style>
 body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:24px}}
