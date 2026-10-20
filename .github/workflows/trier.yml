@@ -34,7 +34,8 @@ jobs:
           python3 - <<'EOF'
           import os, re, shutil, glob
           exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
-          rx = re.compile(r"^ep_(\d+(?:\s*-\s*\d+)*)_", re.I)
+          rx = re.compile(r"^ep_(\d+[a-z]?(?:\s*-\s*\d+[a-z]?)*)_", re.I)
+          sc = re.compile(r"^sans[ _-]*clap", re.I)
 
           sources = glob.glob("inbox/*")
           sources += [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -46,12 +47,15 @@ jobs:
               name = os.path.basename(src)
               if not name.lower().endswith(exts):
                   continue
-              m = rx.match(name)
-              if not m:
-                  continue
-              eps = sorted(set(int(n) for n in re.findall(r"\d+", m.group(1))))
-              for ep in eps:
-                  dest = f"episodes/EP_{ep}"
+              if sc.match(name):
+                  dests = ["episodes/SANS_CLAP"]
+              else:
+                  m = rx.match(name)
+                  if not m:
+                      continue
+                  eps = sorted(set(int(n) for n in re.findall(r"\d+", m.group(1))))
+                  dests = [f"episodes/EP_{ep}" for ep in eps]
+              for dest in dests:
                   os.makedirs(dest, exist_ok=True)
                   shutil.copy2(src, os.path.join(dest, name))
               os.remove(src)
