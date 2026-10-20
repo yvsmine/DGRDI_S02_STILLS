@@ -31,16 +31,38 @@ jobs:
 
       - name: Ranger les stills par épisode
         run: |
-          shopt -s nullglob nocaseglob
-          for f in inbox/* *.jpg *.jpeg *.png *.webp *.tif *.tiff; do
-            [ -f "$f" ] || continue
-            name=$(basename "$f")
-            if [[ "$name" =~ ^[Ee][Pp]_([0-9]+)_ ]]; then
-              ep="EP_${BASH_REMATCH[1]}"
-              mkdir -p "episodes/$ep"
-              git mv -f "$f" "episodes/$ep/$name"
-            fi
-          done
+          python3 - <<'EOF'
+          import os, re, shutil, glob
+          exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
+          rx = re.compile(r"^ep_(\d+(?:\s*-\s*\d+)*)_", re.I)
+
+          sources = glob.glob("inbox/*")
+          sources += [f for f in os.listdir(".") if os.path.isfile(f)]
+          for d in glob.glob("episodes/*"):
+              if os.path.isdir(d) and "-" in os.path.basename(d):
+                  sources += [os.path.join(d, f) for f in os.listdir(d)]
+
+          for src in sources:
+              name = os.path.basename(src)
+              if not name.lower().endswith(exts):
+                  continue
+              m = rx.match(name)
+              if not m:
+                  continue
+              eps = sorted(set(int(n) for n in re.findall(r"\d+", m.group(1))))
+              for ep in eps:
+                  dest = f"episodes/EP_{ep}"
+                  os.makedirs(dest, exist_ok=True)
+                  shutil.copy2(src, os.path.join(dest, name))
+              os.remove(src)
+
+          for d in glob.glob("episodes/*"):
+              if os.path.isdir(d) and "-" in os.path.basename(d):
+                  try:
+                      os.rmdir(d)
+                  except OSError:
+                      pass
+          EOF
 
       - name: Enregistrer
         run: |
