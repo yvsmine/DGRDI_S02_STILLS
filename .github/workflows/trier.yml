@@ -29,43 +29,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ranger les stills par épisode
+      - name: Ranger les stills par séquence
         run: |
           python3 - <<'EOF'
           import os, re, shutil, glob
           exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
-          rx = re.compile(r"^ep_(\d+[a-z]?(?:\s*-\s*\d+[a-z]?)*)_", re.I)
+          seq = re.compile(r"seq[ _-]*(\d+)([a-z]?)", re.I)
           sc = re.compile(r"^sans[ _-]*clap", re.I)
 
           sources = glob.glob("inbox/*")
           sources += [f for f in os.listdir(".") if os.path.isfile(f)]
-          for d in glob.glob("episodes/*"):
-              if os.path.isdir(d) and "-" in os.path.basename(d):
-                  sources += [os.path.join(d, f) for f in os.listdir(d)]
 
           for src in sources:
               name = os.path.basename(src)
               if not name.lower().endswith(exts):
                   continue
               if sc.match(name):
-                  dests = ["episodes/SANS_CLAP"]
+                  dest = "sequences/SANS_CLAP"
               else:
-                  m = rx.match(name)
+                  m = seq.search(name)
                   if not m:
                       continue
-                  eps = sorted(set(int(n) for n in re.findall(r"\d+", m.group(1))))
-                  dests = [f"episodes/EP_{ep}" for ep in eps]
-              for dest in dests:
-                  os.makedirs(dest, exist_ok=True)
-                  shutil.copy2(src, os.path.join(dest, name))
+                  dest = f"sequences/SEQ_{int(m.group(1)):02d}{m.group(2).upper()}"
+              os.makedirs(dest, exist_ok=True)
+              shutil.copy2(src, os.path.join(dest, name))
               os.remove(src)
-
-          for d in glob.glob("episodes/*"):
-              if os.path.isdir(d) and "-" in os.path.basename(d):
-                  try:
-                      os.rmdir(d)
-                  except OSError:
-                      pass
           EOF
 
       - name: Enregistrer
