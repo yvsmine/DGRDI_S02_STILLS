@@ -1,6 +1,7 @@
 import os, re, shutil, html
 from urllib.parse import quote
 
+ROOT = "sequences"
 serie = html.escape(os.environ.get("SERIE", "Stills"))
 exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
 
@@ -8,7 +9,7 @@ def natural(s):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
 
 def folder_key(name):
-    return (0 if name.upper().startswith("EP_") else 1, natural(name))
+    return (1 if name.upper().startswith("SANS") else 0, natural(name))
 
 def label(name):
     return html.escape(name.replace("_", " "))
@@ -105,10 +106,10 @@ shutil.rmtree("_site", ignore_errors=True)
 os.makedirs("_site")
 
 cards = ""
-if os.path.isdir("episodes"):
-    shutil.copytree("episodes", "_site/episodes")
-    for folder in sorted(os.listdir("episodes"), key=folder_key):
-        d = os.path.join("episodes", folder)
+if os.path.isdir(ROOT):
+    shutil.copytree(ROOT, f"_site/{ROOT}")
+    for folder in sorted(os.listdir(ROOT), key=folder_key):
+        d = os.path.join(ROOT, folder)
         if not os.path.isdir(d):
             continue
         files = sorted(
@@ -127,14 +128,14 @@ if os.path.isdir("episodes"):
             f'<h1>{label(folder)} <small>({len(files)} stills)</small></h1>'
             f'<div class="grid">{thumbs}</div>'
         )
-        with open(f"_site/episodes/{folder}/index.html", "w", encoding="utf-8") as fh:
+        with open(f"_site/{ROOT}/{folder}/index.html", "w", encoding="utf-8") as fh:
             fh.write(
                 page(f"{label(folder)} – {serie}", body, LIGHTBOX_HTML + LIGHTBOX_JS)
             )
 
         cards += (
-            f'<a class="folder" href="episodes/{quote(folder)}/">'
-            f'<img loading="lazy" src="episodes/{quote(folder)}/{quote(files[0])}">'
+            f'<a class="folder" href="{ROOT}/{quote(folder)}/">'
+            f'<img loading="lazy" src="{ROOT}/{quote(folder)}/{quote(files[0])}">'
             f'<div class="info"><span class="name">{label(folder)}</span>'
             f'<span class="count">{len(files)} stills</span></div></a>'
         )
