@@ -57,10 +57,14 @@ small{color:#888;font-weight:normal}
 #lb .next{right:4px;top:50%;transform:translateY(-50%)}
 #lb .close{right:8px;top:4px;font-size:36px}
 #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center}
-#gate input{width:220px;box-sizing:border-box;padding:12px;font-size:16px;text-align:center;
+#gate form{position:relative;display:inline-block}
+#gate input{width:240px;box-sizing:border-box;padding:12px 44px;font-size:16px;text-align:center;
     border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#eee;outline:none}
 #gate input:focus{border-color:#666}
 #gate input.bad{border-color:#f85149}
+#gate button{position:absolute;right:2px;top:0;bottom:0;width:42px;background:none;border:none;
+    color:#888;font-size:22px;cursor:pointer}
+#gate button:hover{color:#ddd}
 """
 
 LIGHTBOX_HTML = (
@@ -76,7 +80,7 @@ SHELL = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="data:,">
 <title>%%TITLE%%</title><style>%%CSS%%</style></head><body>
-<div id="gate"><form id="f"><input type="password" id="pw" autocomplete="current-password" aria-label="Mot de passe"></form></div>
+<div id="gate"><form id="f"><input type="password" id="pw" autocomplete="current-password" aria-label="Mot de passe" enterkeyhint="go"><button type="submit" aria-label="Valider">&rarr;</button></form></div>
 <div id="app">%%BODY%%</div>
 <script>
 var D = %%DATA%%;
