@@ -64,8 +64,13 @@ jobs:
           git diff --cached --quiet || git commit -m "Tri automatique des stills"
           git push
 
+      - name: Installer les dépendances
+        run: pip install cryptography
+
       - name: Générer la galerie
         run: python3 build_site.py
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
