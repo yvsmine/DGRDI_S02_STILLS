@@ -1,8 +1,13 @@
-import os, re, shutil, html
+import os, re, shutil, html, json, base64
 from urllib.parse import quote
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 
 ROOT = "sequences"
 serie = html.escape(os.environ.get("SERIE", "Stills"))
+PASSWORD = os.environ.get("SITE_PASSWORD", "")
+ITER = 200000
 exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
 
 def natural(s):
@@ -13,6 +18,15 @@ def folder_key(name):
 
 def label(name):
     return html.escape(name.replace("_", " "))
+
+def encrypt(text):
+    salt = os.urandom(16)
+    iv = os.urandom(12)
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITER)
+    key = kdf.derive(PASSWORD.encode())
+    ct = AESGCM(key).encrypt(iv, text.encode("utf-8"), None)
+    b = lambda x: base64.b64encode(x).decode()
+    return {"s": b(salt), "i": b(iv), "c": b(ct), "n": ITER}
 
 CSS = """
 body{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:24px}
@@ -42,6 +56,11 @@ small{color:#888;font-weight:normal}
 #lb .prev{left:4px;top:50%;transform:translateY(-50%)}
 #lb .next{right:4px;top:50%;transform:translateY(-50%)}
 #lb .close{right:8px;top:4px;font-size:36px}
+#gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center}
+#gate input{width:220px;box-sizing:border-box;padding:12px;font-size:16px;text-align:center;
+    border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#eee;outline:none}
+#gate input:focus{border-color:#666}
+#gate input.bad{border-color:#f85149}
 """
 
 LIGHTBOX_HTML = (
@@ -52,13 +71,37 @@ LIGHTBOX_HTML = (
     '<div class="cap" id="lb-cap"></div></div>'
 )
 
-LIGHTBOX_JS = """
+SHELL = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:,">
+<title>%%TITLE%%</title><style>%%CSS%%</style></head><body>
+<div id="gate"><form id="f"><input type="password" id="pw" autocomplete="current-password" aria-label="Mot de passe"></form></div>
+<div id="app">%%BODY%%</div>
 <script>
-(function(){
-  var links = Array.prototype.slice.call(document.querySelectorAll('.grid a'));
-  var lb = document.getElementById('lb');
-  var img = document.getElementById('lb-img');
-  var cap = document.getElementById('lb-cap');
+var D = %%DATA%%;
+var app = document.getElementById('app');
+var gate = document.getElementById('gate');
+var pw = document.getElementById('pw');
+
+function b64(s){ return Uint8Array.from(atob(s), function(c){ return c.charCodeAt(0); }); }
+
+async function dec(p){
+  var enc = new TextEncoder();
+  var km = await crypto.subtle.importKey('raw', enc.encode(p), 'PBKDF2', false, ['deriveKey']);
+  var key = await crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:b64(D.s), iterations:D.n, hash:'SHA-256'},
+    km, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  var pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(D.i)}, key, b64(D.c));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+function initLb(){
+  var links = Array.prototype.slice.call(app.querySelectorAll('.grid a'));
+  var lb = app.querySelector('#lb');
+  if (!links.length || !lb) return;
+  var img = lb.querySelector('#lb-img');
+  var cap = lb.querySelector('#lb-cap');
   var cur = 0;
   function show(i){
     cur = (i + links.length) % links.length;
@@ -90,17 +133,60 @@ LIGHTBOX_JS = """
     if (Math.abs(dx) > 50) show(dx < 0 ? cur + 1 : cur - 1);
     x0 = null;
   });
-})();
-</script>
-"""
+}
 
-def page(title, body, extra=""):
-    return (
-        '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<meta name="robots" content="noindex,nofollow">'
-        f"<title>{title}</title><style>{CSS}</style></head><body>{body}{extra}</body></html>"
-    )
+function unlock(o, p){
+  try { sessionStorage.setItem('sp', p); } catch(e) {}
+  gate.style.display = 'none';
+  document.title = o.t;
+  app.innerHTML = o.b;
+  app.style.display = 'block';
+  initLb();
+}
+
+async function tryPw(p, silent){
+  try {
+    unlock(await dec(p), p);
+  } catch(e) {
+    gate.style.display = 'flex';
+    if (!silent) { pw.classList.add('bad'); pw.value = ''; }
+    pw.focus();
+  }
+}
+
+if (!D) {
+  initLb();
+} else {
+  app.style.display = 'none';
+  var saved = null;
+  try { saved = sessionStorage.getItem('sp'); } catch(e) {}
+  if (saved) {
+    tryPw(saved, true);
+  } else {
+    gate.style.display = 'flex';
+    pw.focus();
+  }
+  document.getElementById('f').addEventListener('submit', function(e){
+    e.preventDefault();
+    pw.classList.remove('bad');
+    tryPw(pw.value, false);
+  });
+}
+</script></body></html>"""
+
+def page(title, body):
+    if PASSWORD:
+        data = json.dumps(encrypt(json.dumps({"t": title, "b": body})))
+        inner = ""
+        shell_title = "•"
+    else:
+        data = "null"
+        inner = body
+        shell_title = title
+    return (SHELL.replace("%%TITLE%%", shell_title)
+                 .replace("%%CSS%%", CSS)
+                 .replace("%%DATA%%", data)
+                 .replace("%%BODY%%", inner))
 
 shutil.rmtree("_site", ignore_errors=True)
 os.makedirs("_site")
@@ -126,12 +212,10 @@ if os.path.isdir(ROOT):
         body = (
             '<a class="back" href="../../">&larr; Retour aux dossiers</a>'
             f'<h1>{label(folder)} <small>({len(files)} stills)</small></h1>'
-            f'<div class="grid">{thumbs}</div>'
+            f'<div class="grid">{thumbs}</div>' + LIGHTBOX_HTML
         )
         with open(f"_site/{ROOT}/{folder}/index.html", "w", encoding="utf-8") as fh:
-            fh.write(
-                page(f"{label(folder)} – {serie}", body, LIGHTBOX_HTML + LIGHTBOX_JS)
-            )
+            fh.write(page(f"{label(folder)} – {serie}", body))
 
         cards += (
             f'<a class="folder" href="{ROOT}/{quote(folder)}/">'
