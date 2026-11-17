@@ -74,6 +74,10 @@ small{color:#888;font-weight:normal}
     font-size:26px;font-weight:700;text-align:center;opacity:0;pointer-events:none;
     transition:opacity .15s;z-index:60}
 #bubble.on{opacity:1}
+@media (hover:hover) and (pointer:fine){
+  #rail,#bubble{display:none}
+  .home{padding-right:0}
+}
 #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center}
 #gate form{position:relative;display:inline-block}
 #gate input{width:240px;box-sizing:border-box;padding:12px 44px;font-size:16px;text-align:center;
