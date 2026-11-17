@@ -19,6 +19,11 @@ def folder_key(name):
 def label(name):
     return html.escape(name.replace("_", " "))
 
+def short(name):
+    if name.upper().startswith("SEQ_"):
+        return html.escape(name[4:])
+    return html.escape("".join(w[0] for w in name.split("_") if w).upper())
+
 def encrypt(text):
     salt = os.urandom(16)
     iv = os.urandom(12)
@@ -35,6 +40,7 @@ a{color:#aaa;text-decoration:none}
 .back{display:inline-block;margin-bottom:16px;color:#ccc;font-size:14px}
 .back:hover{color:#fff}
 small{color:#888;font-weight:normal}
+.home{padding-right:34px}
 .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
 .folder{background:#1a1a1a;border-radius:8px;overflow:hidden;display:block;color:#eee}
 .folder:hover{background:#242424}
@@ -56,6 +62,18 @@ small{color:#888;font-weight:normal}
 #lb .prev{left:4px;top:50%;transform:translateY(-50%)}
 #lb .next{right:4px;top:50%;transform:translateY(-50%)}
 #lb .close{right:8px;top:4px;font-size:36px}
+#rail{position:fixed;right:3px;top:50%;transform:translateY(-50%);width:28px;
+    display:flex;flex-direction:column;align-items:center;padding:6px 0;
+    background:rgba(40,40,40,.6);border-radius:14px;z-index:50;
+    touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+#rail span{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:#999;overflow:hidden}
+#rail span.act{color:#fff;font-weight:700}
+#bubble{position:fixed;right:48px;top:50%;transform:translateY(-50%);min-width:90px;
+    padding:12px 18px;border-radius:12px;background:rgba(0,0,0,.88);color:#fff;
+    font-size:26px;font-weight:700;text-align:center;opacity:0;pointer-events:none;
+    transition:opacity .15s;z-index:60}
+#bubble.on{opacity:1}
 #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center}
 #gate form{position:relative;display:inline-block}
 #gate input{width:240px;box-sizing:border-box;padding:12px 44px;font-size:16px;text-align:center;
@@ -139,13 +157,73 @@ function initLb(){
   });
 }
 
+function initRail(){
+  var rail = app.querySelector('#rail');
+  var bubble = app.querySelector('#bubble');
+  if (!rail || !bubble) return;
+  var items = Array.prototype.slice.call(rail.querySelectorAll('span'));
+  var tiles = items.map(function(s){ return document.getElementById(s.getAttribute('data-t')); });
+  var active = false, last = -1;
+
+  function mark(i){
+    items.forEach(function(s, k){ s.classList.toggle('act', k === i); });
+  }
+  function idx(y){
+    var r = rail.getBoundingClientRect();
+    var i = Math.floor((y - r.top) / r.height * items.length);
+    return Math.max(0, Math.min(items.length - 1, i));
+  }
+  function move(y){
+    var i = idx(y);
+    bubble.style.top = Math.max(40, Math.min(window.innerHeight - 40, y)) + 'px';
+    bubble.style.transform = 'translateY(-50%)';
+    if (i !== last) {
+      last = i;
+      var t = tiles[i];
+      if (t) window.scrollTo(0, t.getBoundingClientRect().top + window.pageYOffset - 16);
+      bubble.textContent = items[i].getAttribute('data-full');
+      mark(i);
+    }
+    bubble.classList.add('on');
+  }
+  function end(){ active = false; last = -1; bubble.classList.remove('on'); }
+
+  rail.addEventListener('pointerdown', function(e){
+    active = true;
+    try { rail.setPointerCapture(e.pointerId); } catch(err) {}
+    move(e.clientY);
+    e.preventDefault();
+  });
+  rail.addEventListener('pointermove', function(e){ if (active) move(e.clientY); });
+  rail.addEventListener('pointerup', end);
+  rail.addEventListener('pointercancel', end);
+
+  var ticking = false;
+  function onScroll(){
+    if (ticking || active) return;
+    ticking = true;
+    requestAnimationFrame(function(){
+      var cur = 0;
+      for (var k = 0; k < tiles.length; k++) {
+        if (tiles[k] && tiles[k].getBoundingClientRect().top <= 140) cur = k;
+      }
+      mark(cur);
+      ticking = false;
+    });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+}
+
+function initAll(){ initLb(); initRail(); }
+
 function unlock(o, p){
   try { sessionStorage.setItem('sp', p); } catch(e) {}
   gate.style.display = 'none';
   document.title = o.t;
   app.innerHTML = o.b;
   app.style.display = 'block';
-  initLb();
+  initAll();
 }
 
 async function tryPw(p, silent){
@@ -159,7 +237,7 @@ async function tryPw(p, silent){
 }
 
 if (!D) {
-  initLb();
+  initAll();
 } else {
   app.style.display = 'none';
   var saved = null;
@@ -196,6 +274,7 @@ shutil.rmtree("_site", ignore_errors=True)
 os.makedirs("_site")
 
 cards = ""
+names = []
 if os.path.isdir(ROOT):
     shutil.copytree(ROOT, f"_site/{ROOT}")
     for folder in sorted(os.listdir(ROOT), key=folder_key):
@@ -221,13 +300,27 @@ if os.path.isdir(ROOT):
         with open(f"_site/{ROOT}/{folder}/index.html", "w", encoding="utf-8") as fh:
             fh.write(page(f"{label(folder)} – {serie}", body))
 
+        names.append(folder)
         cards += (
-            f'<a class="folder" href="{ROOT}/{quote(folder)}/">'
+            f'<a class="folder" id="t-{html.escape(folder)}" href="{ROOT}/{quote(folder)}/">'
             f'<img loading="lazy" src="{ROOT}/{quote(folder)}/{quote(files[0])}">'
             f'<div class="info"><span class="name">{label(folder)}</span>'
             f'<span class="count">{len(files)} stills</span></div></a>'
         )
 
-home = f'<h1>{serie}</h1><div class="folders">{cards}</div>'
+rail = ""
+if names:
+    spans = "".join(
+        f'<span data-t="t-{html.escape(n)}" data-full="{label(n)}">{short(n)}</span>'
+        for n in names
+    )
+    rail = (
+        f'<div id="rail" style="height:min(80vh,{len(names) * 28}px)">{spans}</div>'
+        '<div id="bubble"></div>'
+    )
+
+home = (
+    f'<div class="home"><h1>{serie}</h1><div class="folders">{cards}</div></div>{rail}'
+)
 with open("_site/index.html", "w", encoding="utf-8") as fh:
     fh.write(page(f"{serie} – Stills", home))
