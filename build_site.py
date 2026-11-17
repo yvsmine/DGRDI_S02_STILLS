@@ -40,7 +40,7 @@ a{color:#aaa;text-decoration:none}
 .back{display:inline-block;margin-bottom:16px;color:#ccc;font-size:14px}
 .back:hover{color:#fff}
 small{color:#888;font-weight:normal}
-.home{padding-right:34px}
+.home{padding-right:38px}
 .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
 .folder{background:#1a1a1a;border-radius:8px;overflow:hidden;display:block;color:#eee}
 .folder:hover{background:#242424}
@@ -62,14 +62,14 @@ small{color:#888;font-weight:normal}
 #lb .prev{left:4px;top:50%;transform:translateY(-50%)}
 #lb .next{right:4px;top:50%;transform:translateY(-50%)}
 #lb .close{right:8px;top:4px;font-size:36px}
-#rail{position:fixed;right:3px;top:50%;transform:translateY(-50%);width:28px;
+#rail{position:fixed;right:3px;top:50%;transform:translateY(-50%);width:32px;
     display:flex;flex-direction:column;align-items:center;padding:6px 0;
-    background:rgba(40,40,40,.6);border-radius:14px;z-index:50;
+    background:rgba(40,40,40,.65);border-radius:16px;z-index:50;
     touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
 #rail span{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;
-    font-size:10px;color:#999;overflow:hidden}
+    font-size:11px;color:#999;overflow:hidden;white-space:nowrap}
 #rail span.act{color:#fff;font-weight:700}
-#bubble{position:fixed;right:48px;top:50%;transform:translateY(-50%);min-width:90px;
+#bubble{position:fixed;right:52px;top:50%;transform:translateY(-50%);min-width:90px;
     padding:12px 18px;border-radius:12px;background:rgba(0,0,0,.88);color:#fff;
     font-size:26px;font-weight:700;text-align:center;opacity:0;pointer-events:none;
     transition:opacity .15s;z-index:60}
@@ -163,10 +163,18 @@ function initRail(){
   if (!rail || !bubble) return;
   var items = Array.prototype.slice.call(rail.querySelectorAll('span'));
   var tiles = items.map(function(s){ return document.getElementById(s.getAttribute('data-t')); });
-  var active = false, last = -1;
+  var active = false, last = -1, step = 1;
 
+  function layout(){
+    var h = rail.clientHeight / items.length;
+    step = Math.max(1, Math.ceil(16 / h));
+    items.forEach(function(s, k){
+      s.style.visibility = (k % step === 0) ? 'visible' : 'hidden';
+    });
+  }
   function mark(i){
-    items.forEach(function(s, k){ s.classList.toggle('act', k === i); });
+    var m = Math.floor(i / step) * step;
+    items.forEach(function(s, k){ s.classList.toggle('act', k === m); });
   }
   function idx(y){
     var r = rail.getBoundingClientRect();
@@ -212,6 +220,8 @@ function initRail(){
     });
   }
   window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', function(){ layout(); onScroll(); });
+  layout();
   onScroll();
 }
 
