@@ -34,8 +34,9 @@ jobs:
           python3 - <<'EOF'
           import os, re, shutil, glob
           exts = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff")
-          seq = re.compile(r"seq[ _-]*(\d+)([a-z]?)", re.I)
-          sc = re.compile(r"^sans[ _-]*clap", re.I)
+          num = re.compile(r"seq[ _-]*(\d+)([a-z]?)(?![a-z])", re.I)
+          sc = re.compile(r"sans[ _-]*clap", re.I)
+          word = re.compile(r"^seq[ _-]+([a-z][a-z0-9]*)", re.I)
 
           sources = glob.glob("inbox/*")
           sources += [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -44,13 +45,17 @@ jobs:
               name = os.path.basename(src)
               if not name.lower().endswith(exts):
                   continue
-              if sc.match(name):
+              if sc.search(name):
                   dest = "sequences/SANS_CLAP"
               else:
-                  m = seq.search(name)
-                  if not m:
-                      continue
-                  dest = f"sequences/SEQ_{int(m.group(1)):02d}{m.group(2).upper()}"
+                  m = num.search(name)
+                  if m:
+                      dest = f"sequences/SEQ_{int(m.group(1)):02d}{m.group(2).upper()}"
+                  else:
+                      w = word.match(name)
+                      if not w:
+                          continue
+                      dest = f"sequences/{w.group(1).upper()}"
               os.makedirs(dest, exist_ok=True)
               shutil.copy2(src, os.path.join(dest, name))
               os.remove(src)
